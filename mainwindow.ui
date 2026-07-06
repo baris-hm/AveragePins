@@ -19,7 +19,7 @@
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
        <widget class="QWidget" name="widget" native="true">
-        <widget class="QGraphicsView" name="graphicsView">
+        <widget class="PixelCanvasView" name="graphicsView">
          <property name="geometry">
           <rect>
            <x>10</x>
@@ -104,6 +104,13 @@
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PixelCanvasView</class>
+   <extends>QGraphicsView</extends>
+   <header>pixelcanvasview.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
