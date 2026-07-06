@@ -24,6 +24,8 @@ MainWindow::MainWindow(QWidget *parent)
 
 
     activePinSetIndex = -1;
+
+    ui->graphicsView->setAlignment(Qt::AlignCenter);
     // letting this go for now, it's already connected by slot - hence opens the thing twice
     //connect(ui->addImageButton, &QPushButton::clicked, this, &MainWindow::on_addImageButton_clicked);
 }
