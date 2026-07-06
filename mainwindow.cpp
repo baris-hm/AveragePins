@@ -22,7 +22,9 @@ MainWindow::MainWindow(QWidget *parent)
     // bg color
     scene -> setBackgroundBrush(Qt::lightGray);
 
-    // already connected behind the scenes by slot
+
+    activePinSetIndex = -1;
+    // letting this go for now, it's already connected by slot - hence opens the thing twice
     //connect(ui->addImageButton, &QPushButton::clicked, this, &MainWindow::on_addImageButton_clicked);
 }
 
@@ -79,4 +81,56 @@ void MainWindow::updateLayerOrder()
             layers[i]->setZValue(count - i);
         }
     }
+}
+
+void MainWindow::on_newPinSetButton_clicked()
+{
+    PinSet newSet;
+    int setNumber = pinSets.size() + 1;
+    newSet.name = QString("PinSet %1").arg(setNumber);
+
+    QColor colors[] = {Qt::red, Qt::green, Qt::blue, Qt::magenta, Qt::cyan, Qt::yellow};
+    newSet.color = colors[pinSets.size() % 6];
+
+    pinSets.append(newSet);
+
+    //pinSetListWidget here refers to the actual QListWidget in mainwindow.ui
+    ui->pinSetListWidget->addItem(newSet.name);
+
+    ui->pinSetListWidget->setCurrentRow(pinSets.size() - 1);
+    activePinSetIndex = pinSets.size() - 1;
+}
+
+void MainWindow::addPinAtPosition(const QPointF& scenePos)
+{
+    activePinSetIndex = ui->pinSetListWidget->currentRow();
+
+    if (activePinSetIndex < 0 || activePinSetIndex >= pinSets.size()) {
+        // if they haven't created a pin set yet, don't let them drop a pin
+        return;
+    }
+
+    // snap to the exact absolute center of the pixel clicked
+    QPointF snappedPos(std::floor(scenePos.x()) + 0.5, std::floor(scenePos.y()) + 0.5);
+
+    //  an actual small circle to represent the pin
+    double radius = 1.0;
+    QGraphicsEllipseItem *visualPin = scene->addEllipse(
+        snappedPos.x() - radius,
+        snappedPos.y() - radius,
+        radius * 2,
+        radius * 2,
+        QPen(Qt::black, 0.2), // Black outline
+        QBrush(pinSets[activePinSetIndex].color) // Filled with the Pin Set's unique color
+        );
+
+    // Ensure pins sit on the very top layer above all photos
+    visualPin->setZValue(10000);
+
+    // Bundle it into our data structures
+    Pin pin;
+    pin.position = snappedPos;
+    pin.visualItem = visualPin;
+
+    pinSets[activePinSetIndex].pins.append(pin);
 }

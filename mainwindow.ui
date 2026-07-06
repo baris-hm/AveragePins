@@ -75,7 +75,14 @@
            </widget>
           </item>
           <item>
-           <widget class="QListWidget" name="listWidget_2"/>
+           <widget class="QListWidget" name="pinSetListWidget"/>
+          </item>
+          <item>
+           <widget class="QPushButton" name="newPinSetButton">
+            <property name="text">
+             <string>New Pin Set</string>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QPushButton" name="pushButton">

@@ -5,6 +5,24 @@
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem> // image items
 #include <QList>
+#include <QGraphicsEllipseItem> // for pins
+#include <QColor>
+
+// my own pin struct
+
+struct Pin{
+    QPointF position;
+    QGraphicsEllipseItem* visualItem;
+};
+
+// a group of pins
+struct PinSet{
+    QString name;
+    QColor color;
+    QList<Pin> pins;
+};
+
+
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -18,8 +36,12 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
+    void addPinAtPosition(const QPointF& scenePos);
+
 private slots:
     void on_addImageButton_clicked();
+    void on_newPinSetButton_clicked();
+
 
 private:
     Ui::MainWindow *ui;
@@ -27,6 +49,9 @@ private:
 
     // Track image layers
     QList<QGraphicsPixmapItem*> layers;
+
+    QList<PinSet> pinSets;
+    int activePinSetIndex = -1; // could also call this selectedPinSetIndex
 
     void updateLayerOrder(); // z-order helper
 };

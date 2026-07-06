@@ -14,6 +14,7 @@ public:
 protected:
     // Override mouse wheel event for zooming
     void wheelEvent(QWheelEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
 };
 
 #endif // PIXELCANVASVIEW_H
