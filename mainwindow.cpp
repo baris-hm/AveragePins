@@ -90,8 +90,8 @@ void MainWindow::on_addImageButton_clicked()
 
         visButton->setText("👁");
         visButton->setCheckable(true);
-        visButton->setChecked(true); // Default visible
-        delButton->setText("❌");
+        visButton->setChecked(true);
+        delButton->setText("🗑");
 
         rowLayout->addWidget(nameLabel, 1); // Gives label maximum stretch space
         rowLayout->addWidget(visButton);
@@ -123,6 +123,7 @@ void MainWindow::on_addImageButton_clicked()
     }
 
     updateLayerOrder();
+    updateLayerInteractivity();
 }
 
 void MainWindow::updateLayerOrder()
@@ -130,22 +131,103 @@ void MainWindow::updateLayerOrder()
     on_layersReordered();
 }
 
+#include <QHBoxLayout>
+#include <QToolButton>
+
 void MainWindow::on_newPinSetButton_clicked()
 {
+    // 1. Initialize the internal data structure
     PinSet newSet;
     int setNumber = pinSets.size() + 1;
-    newSet.name = QString("PinSet %1").arg(setNumber);
+    newSet.name = QString("Pin Set %1").arg(setNumber);
 
     QColor colors[] = {Qt::red, Qt::green, Qt::blue, Qt::magenta, Qt::cyan, Qt::yellow};
     newSet.color = colors[pinSets.size() % 6];
+    newSet.isVisible = true;
 
     pinSets.append(newSet);
+    int currentSetIndex = pinSets.size() - 1;
 
-    //pinSetListWidget here refers to the actual QListWidget in mainwindow.ui
-    ui->pinSetListWidget->addItem(newSet.name);
+    // 2. Create a blank list widget item
+    QListWidgetItem *listItem = new QListWidgetItem();
+    ui->pinSetListWidget->addItem(listItem);
 
-    ui->pinSetListWidget->setCurrentRow(pinSets.size() - 1);
-    activePinSetIndex = pinSets.size() - 1;
+    // Store the unique index number inside this list item so we know which PinSet it maps to
+    listItem->setData(Qt::UserRole, currentSetIndex);
+
+    // 3. Build the custom container widget row
+    QWidget *rowWidget = new QWidget();
+    QHBoxLayout *rowLayout = new QHBoxLayout(rowWidget);
+    rowLayout->setContentsMargins(5, 2, 5, 2);
+
+    QLabel *nameLabel = new QLabel(newSet.name);
+    QToolButton *visButton = new QToolButton();
+    QToolButton *delButton = new QToolButton();
+
+    visButton->setText("👁"); // this sucks, I'll replace it with an icon later on
+    visButton->setCheckable(true);
+    visButton->setChecked(true);
+    delButton->setText("🗑");
+
+    rowLayout->addWidget(nameLabel, 1);
+    rowLayout->addWidget(visButton);
+    rowLayout->addWidget(delButton);
+
+    ui->pinSetListWidget->setItemWidget(listItem, rowWidget);
+    listItem->setSizeHint(rowWidget->sizeHint());
+
+    // 4. Automatically highlight the newly created set
+    ui->pinSetListWidget->setCurrentItem(listItem);
+    activePinSetIndex = currentSetIndex;
+
+    // 5. Connect Visibility Toggle
+    // We pass currentSetIndex by value to know which set to modify
+    connect(visButton, &QToolButton::toggled, this, [this, currentSetIndex](bool checked) {
+        if (currentSetIndex >= this->pinSets.size()) return;
+
+        this->pinSets[currentSetIndex].isVisible = checked;
+
+        // Loop through all pins belonging to this set and hide/show them
+        for (const Pin& pin : std::as_const(this->pinSets[currentSetIndex].pins)) {
+            if (pin.visualItem) {
+                pin.visualItem->setVisible(checked);
+            }
+        }
+    });
+
+    connect(delButton, &QToolButton::clicked, this, [this, listItem]() {
+        // Find which index this item currently points to
+        int indexToDelete = listItem->data(Qt::UserRole).toInt();
+        if (indexToDelete >= this->pinSets.size()) return;
+
+        // Clean up all physical visual pins from the canvas scene first
+        for (const Pin& pin : std::as_const(this->pinSets[indexToDelete].pins)) {
+            if (pin.visualItem) {
+                this->scene->removeItem(pin.visualItem);
+                delete pin.visualItem;
+            }
+        }
+
+        // Remove the data structure from our vector
+        this->pinSets.removeAt(indexToDelete);
+
+        // Delete the UI list item row
+        int row = this->ui->pinSetListWidget->row(listItem);
+        delete this->ui->pinSetListWidget->takeItem(row);
+
+        // CRITICAL FIX: Because we removed an item from the middle of the pinSets list,
+        // all items after it shifted down by 1 index! We must re-index the remaining UI rows.
+        for (int i = 0; i < this->ui->pinSetListWidget->count(); ++i) {
+            QListWidgetItem *item = this->ui->pinSetListWidget->item(i);
+            if (item && item->data(Qt::UserRole).toInt() > indexToDelete) {
+                int oldIndex = item->data(Qt::UserRole).toInt();
+                item->setData(Qt::UserRole, oldIndex - 1);
+            }
+        }
+
+        // Reset active selection safely
+        this->activePinSetIndex = this->ui->pinSetListWidget->currentRow();
+    });
 }
 
 void MainWindow::addPinAtPosition(const QPointF& scenePos)
@@ -267,8 +349,9 @@ void MainWindow::on_calculateButton_clicked()
         resultMarker->setZValue(20000); // Sit on top of everything else
         }
 
+    // TODOne: COMMENT THIS MESSAGE OUT.
     // Pop up a neat dialog box showing the user the exact final output pixels
-    QMessageBox::information(this, tr("Calculation Complete"), resultsSummary);
+    //QMessageBox::information(this, tr("Calculation Complete"), resultsSummary);
 }
 
 void MainWindow::updateLayerInteractivity(){

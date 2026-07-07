@@ -20,6 +20,7 @@ struct PinSet{
     QString name;
     QColor color;
     QList<Pin> pins;
+    bool isVisible = true;
 };
 
 
