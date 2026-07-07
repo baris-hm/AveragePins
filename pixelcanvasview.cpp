@@ -37,23 +37,37 @@ void PixelCanvasView::wheelEvent(QWheelEvent *event)
     double currentScale = transform().m11(); // m11 is the horizontal scaling factor
 
     // limits: Don't zoom out past 10% or in past 100x (10000%) original size
-    if ((factor > 1.0 && currentScale < 100.0) || (factor < 1.0 && currentScale > 0.1)) {
+    if ((factor > 1.0 && currentScale < 100.0) || (factor < 1.0 && currentScale > 1)) {
         scale(factor, factor);
     }
 }
 
 void PixelCanvasView::mousePressEvent(QMouseEvent *event)
 {
-    // right click drops a pin (for now)
-    if (event->button() == Qt::RightButton){
-        QPointF scenePos = mapToScene(event -> pos());
-        QWidget *topLevelWidget = qApp ->activeWindow();
-        MainWindow *mainWindow = qobject_cast<MainWindow*>(topLevelWidget);
-        if (mainWindow){
-            mainWindow -> addPinAtPosition(scenePos);
-        }
-        return; // this. so that clicking won't drag
-    }
-    QGraphicsView::mousePressEvent(event);
+    // Find our main window state
+    MainWindow *mainWindow = qobject_cast<MainWindow*>(qApp->activeWindow());
 
+    if (mainWindow) {
+        // HAND TOOL MODE
+        if (mainWindow->currentToolMode() == MainWindow::HandTool) {
+            if (event->button() == Qt::LeftButton) {
+                setDragMode(QGraphicsView::ScrollHandDrag); // Drag canvas around safely
+            }
+        }
+        // MOVE TOOL MODE
+        else if (mainWindow->currentToolMode() == MainWindow::MoveTool) {
+            setDragMode(QGraphicsView::NoDrag); // Left button handles moving individual image layers instead
+        }
+    }
+
+    // Handle pin dropping on Right Click (still works perfectly regardless of mode)
+    if (event->button() == Qt::RightButton) {
+        QPointF scenePos = mapToScene(event->pos());
+        if (mainWindow) {
+            mainWindow->addPinAtPosition(scenePos);
+        }
+        return;
+    }
+
+    QGraphicsView::mousePressEvent(event);
 }
