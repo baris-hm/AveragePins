@@ -4,6 +4,8 @@
 #include <QFileInfo>
 #include <utility>
 #include <QMessageBox>
+#include <QHBoxLayout>
+#include <QToolButton>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -48,42 +50,79 @@ MainWindow::~MainWindow()
 }
 
 
+#include <QHBoxLayout>
+#include <QToolButton>
+
 void MainWindow::on_addImageButton_clicked()
 {
-    // 1. Open file dialog to select images
     QStringList fileNames = QFileDialog::getOpenFileNames(
-        this,
-        tr("Open Images"), "",
-        tr("Image Files (*.png *.jpg *.jpeg *.bmp)"));
+        this, tr("Open Images"), "", tr("Image Files (*.png *.jpg *.jpeg *.bmp)"));
 
-    // 2. Process each selected file
-    // std::as_const wrapper here. otherwise Qt detaches (copies the whole thing) -> memory/cpu wasted.
     for (const QString &fileName : std::as_const(fileNames)) {
         QPixmap pixmap(fileName);
-        if (pixmap.isNull()) continue; // Skip if the image failed to load
+        if (pixmap.isNull()) continue;
 
-        // Create a new graphics item for the image
         QGraphicsPixmapItem *pixmapItem = new QGraphicsPixmapItem(pixmap);
-
-        // This flag allows the user to click and drag the image around the canvas later!
         pixmapItem->setFlag(QGraphicsItem::ItemIsMovable, true);
         pixmapItem->setFlag(QGraphicsItem::ItemIsSelectable, true);
 
-        // Add to scene and our tracking list
         scene->addItem(pixmapItem);
         layers.append(pixmapItem);
 
-        // Add the file name to the UI ListWidget sidebar
         QFileInfo fileInfo(fileName);
-        QListWidgetItem *listItem = new QListWidgetItem(fileInfo.fileName());
-        QVariant pointerAsVariant = QVariant::fromValue(static_cast<void*>(pixmapItem));
-        listItem->setData(Qt::UserRole, pointerAsVariant);
 
+        // 1. Create a blank base list item
+        QListWidgetItem *listItem = new QListWidgetItem();
         ui->layerListWidget->addItem(listItem);
+
+        // Store our layer pointer in the item just like before
+        listItem->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(pixmapItem)));
+
+        // 2. Create a custom container widget for this row
+        QWidget *rowWidget = new QWidget();
+        QHBoxLayout *rowLayout = new QHBoxLayout(rowWidget);
+        rowLayout->setContentsMargins(5, 2, 5, 2); // Tight spacing
+
+        // 3. Add Elements to the row layout
+        QLabel *nameLabel = new QLabel(fileInfo.fileName());
+        QToolButton *visButton = new QToolButton();
+        QToolButton *delButton = new QToolButton();
+
+        visButton->setText("👁");
+        visButton->setCheckable(true);
+        visButton->setChecked(true); // Default visible
+        delButton->setText("❌");
+
+        rowLayout->addWidget(nameLabel, 1); // Gives label maximum stretch space
+        rowLayout->addWidget(visButton);
+        rowLayout->addWidget(delButton);
+
+        // 4. Inject the custom row widget into the list widget item slot
+        ui->layerListWidget->setItemWidget(listItem, rowWidget);
+
+        // Match list item visual height to the newly inserted custom widget height
+        listItem->setSizeHint(rowWidget->sizeHint());
+
+        // 5. Connect the button signals using C++ lambdas!
+        connect(visButton, &QToolButton::toggled, this, [pixmapItem](bool checked) {
+            pixmapItem->setVisible(checked); // Toggles image on canvas
+        });
+
+        connect(delButton, &QToolButton::clicked, this, [this, listItem, pixmapItem]() {
+            // Remove from canvas scene
+            this->scene->removeItem(pixmapItem);
+            this->layers.removeOne(pixmapItem);
+            delete pixmapItem; // Free memory safely
+
+            // Remove from UI List
+            int row = this->ui->layerListWidget->row(listItem);
+            delete this->ui->layerListWidget->takeItem(row);
+
+            this->updateLayerOrder();
+        });
     }
 
     updateLayerOrder();
-    updateLayerInteractivity();
 }
 
 void MainWindow::updateLayerOrder()
@@ -244,18 +283,14 @@ void MainWindow::on_layersReordered()
 {
     int count = ui->layerListWidget->count();
 
-    // Loop through the list widget in its new physical order
     for (int i = 0; i < count; ++i) {
         QListWidgetItem *item = ui->layerListWidget->item(i);
         if (!item) continue;
 
-        // Extract the hidden pointer back out
         void* rawPointer = item->data(Qt::UserRole).value<void*>();
         QGraphicsPixmapItem* layer = static_cast<QGraphicsPixmapItem*>(rawPointer);
 
         if (layer) {
-            // If index 0 is the top layer, give it the highest Z-value (count - i)
-            // So if there are 3 items: Index 0 gets Z=3, Index 1 gets Z=2, Index 2 gets Z=1
             layer->setZValue(count - i);
         }
     }
