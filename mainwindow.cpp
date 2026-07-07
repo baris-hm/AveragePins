@@ -6,6 +6,7 @@
 #include <QMessageBox>
 #include <QHBoxLayout>
 #include <QToolButton>
+#include <QLineEdit>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -20,6 +21,14 @@ MainWindow::MainWindow(QWidget *parent)
     ui->layerListWidget->setDragDropMode(QAbstractItemView::InternalMove);
     connect(ui->layerListWidget->model(), &QAbstractItemModel::rowsMoved,
             this, &MainWindow::on_layersReordered);
+
+    // layer name edit connectino
+    connect(ui->layerListWidget, &QListWidget::itemDoubleClicked,
+            this, &MainWindow::on_layerItemDoubleClicked);
+    // pin set name edit connection
+    connect(ui->pinSetListWidget, &QListWidget::itemDoubleClicked,
+            this, &MainWindow::on_pinSetItemDoubleClicked);
+
     // Initalizing the scene
     scene = new QGraphicsScene(this);
 
@@ -377,4 +386,79 @@ void MainWindow::on_layersReordered()
             layer->setZValue(count - i);
         }
     }
+}
+
+#include <QLineEdit>
+
+void MainWindow::on_layerItemDoubleClicked(QListWidgetItem *item)
+{
+    if (!item) return;
+
+    // Get the custom widget layout we injected into this row
+    QWidget *rowWidget = ui->layerListWidget->itemWidget(item);
+    if (!rowWidget) return;
+
+    // Find the QLabel inside that row widget
+    QLabel *nameLabel = rowWidget->findChild<QLabel*>();
+    if (!nameLabel || !nameLabel->isVisible()) return; // Don't do anything if it's already editing
+
+    // Create an editable line input field
+    QLineEdit *lineEdit = new QLineEdit(nameLabel->text(), rowWidget);
+
+    // Swap them in the layout
+    rowWidget->layout()->replaceWidget(nameLabel, lineEdit);
+    nameLabel->hide();
+    lineEdit->setFocus();
+    lineEdit->selectAll();
+
+    // Helper lambda function to finalize the text change
+    auto finishEditing = [nameLabel, lineEdit, rowWidget]() {
+        if (!lineEdit->text().trimmed().isEmpty()) {
+            nameLabel->setText(lineEdit->text().trimmed());
+        }
+        rowWidget->layout()->replaceWidget(lineEdit, nameLabel);
+        nameLabel->show();
+        lineEdit->deleteLater(); // Safely destroy the input box
+    };
+
+    // Trigger finish if they press Enter or click away
+    connect(lineEdit, &QLineEdit::returnPressed, this, finishEditing);
+    connect(lineEdit, &QLineEdit::editingFinished, this, finishEditing);
+}
+
+
+void MainWindow::on_pinSetItemDoubleClicked(QListWidgetItem *item)
+{
+    if (!item) return;
+
+    QWidget *rowWidget = ui->pinSetListWidget->itemWidget(item);
+    if (!rowWidget) return;
+
+    QLabel *nameLabel = rowWidget->findChild<QLabel*>();
+    if (!nameLabel || !nameLabel->isVisible()) return;
+
+    QLineEdit *lineEdit = new QLineEdit(nameLabel->text(), rowWidget);
+    rowWidget->layout()->replaceWidget(nameLabel, lineEdit);
+    nameLabel->hide();
+    lineEdit->setFocus();
+    lineEdit->selectAll();
+
+    int setIndex = item->data(Qt::UserRole).toInt();
+
+    auto finishEditing = [this, nameLabel, lineEdit, rowWidget, setIndex]() {
+        QString newName = lineEdit->text().trimmed();
+        if (!newName.isEmpty()) {
+            nameLabel->setText(newName);
+
+            if (setIndex >= 0 && setIndex < this->pinSets.size()) {
+                this->pinSets[setIndex].name = newName;
+            }
+        }
+        rowWidget->layout()->replaceWidget(lineEdit, nameLabel);
+        nameLabel->show();
+        lineEdit->deleteLater();
+    };
+
+    connect(lineEdit, &QLineEdit::returnPressed, this, finishEditing);
+    connect(lineEdit, &QLineEdit::editingFinished, this, finishEditing);
 }

@@ -7,7 +7,7 @@
 #include <QList>
 #include <QGraphicsEllipseItem> // for pins
 #include <QColor>
-
+#include <QListWidgetItem>
 // my own pin struct
 
 struct Pin{
@@ -57,6 +57,10 @@ private slots:
 
     void updateLayerInteractivity();
     void on_layersReordered();
+
+    void on_layerItemDoubleClicked(QListWidgetItem *item);
+
+    void on_pinSetItemDoubleClicked(QListWidgetItem *item);
 
 private:
     Ui::MainWindow *ui;
