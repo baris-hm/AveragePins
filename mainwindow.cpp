@@ -11,7 +11,13 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-
+    ui->layerListWidget->setDragEnabled(true);
+    ui->layerListWidget->setAcceptDrops(true);
+    ui->layerListWidget->setDropIndicatorShown(true);
+    ui->layerListWidget->setDefaultDropAction(Qt::MoveAction);
+    ui->layerListWidget->setDragDropMode(QAbstractItemView::InternalMove);
+    connect(ui->layerListWidget->model(), &QAbstractItemModel::rowsMoved,
+            this, &MainWindow::on_layersReordered);
     // Initalizing the scene
     scene = new QGraphicsScene(this);
 
@@ -69,7 +75,11 @@ void MainWindow::on_addImageButton_clicked()
 
         // Add the file name to the UI ListWidget sidebar
         QFileInfo fileInfo(fileName);
-        ui->layerListWidget->addItem(fileInfo.fileName()); // Ensure your QListWidget is named layerListWidget
+        QListWidgetItem *listItem = new QListWidgetItem(fileInfo.fileName());
+        QVariant pointerAsVariant = QVariant::fromValue(static_cast<void*>(pixmapItem));
+        listItem->setData(Qt::UserRole, pointerAsVariant);
+
+        ui->layerListWidget->addItem(listItem);
     }
 
     updateLayerOrder();
@@ -78,18 +88,7 @@ void MainWindow::on_addImageButton_clicked()
 
 void MainWindow::updateLayerOrder()
 {
-    // Go backward or forward depending on your preference.
-    // Let's say index 0 in the list widget is the topmost visual layer.
-    int count = ui->layerListWidget->count();
-    for (int i = 0; i < count; ++i) {
-        // Find the matching graphics item.
-        // Note: This simple approach assumes layers list matches layerListWidget 1:1
-        if (i < layers.size()) {
-            // High stack value means it sits on top.
-            // If i = 0 (top of list), give it the highest Z-value.
-            layers[i]->setZValue(count - i);
-        }
-    }
+    on_layersReordered();
 }
 
 void MainWindow::on_newPinSetButton_clicked()
@@ -238,5 +237,26 @@ void MainWindow::updateLayerInteractivity(){
     for (QGraphicsPixmapItem* layer : std::as_const(layers)) {
         layer->setFlag(QGraphicsItem::ItemIsMovable, canMove);
         layer->setFlag(QGraphicsItem::ItemIsSelectable, canMove);
+    }
+}
+
+void MainWindow::on_layersReordered()
+{
+    int count = ui->layerListWidget->count();
+
+    // Loop through the list widget in its new physical order
+    for (int i = 0; i < count; ++i) {
+        QListWidgetItem *item = ui->layerListWidget->item(i);
+        if (!item) continue;
+
+        // Extract the hidden pointer back out
+        void* rawPointer = item->data(Qt::UserRole).value<void*>();
+        QGraphicsPixmapItem* layer = static_cast<QGraphicsPixmapItem*>(rawPointer);
+
+        if (layer) {
+            // If index 0 is the top layer, give it the highest Z-value (count - i)
+            // So if there are 3 items: Index 0 gets Z=3, Index 1 gets Z=2, Index 2 gets Z=1
+            layer->setZValue(count - i);
+        }
     }
 }

@@ -55,7 +55,7 @@ private slots:
     void on_calculateButton_clicked();
 
     void updateLayerInteractivity();
-
+    void on_layersReordered();
 
 private:
     Ui::MainWindow *ui;
